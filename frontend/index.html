@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AccessDrift - Zero-Trust Identity Governance</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Top Header Navigation -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo-badge">AD</div>
+        <div>
+          <h1 class="logo-title">AccessDrift</h1>
+          <p class="logo-subtitle">Continuous Identity Entitlement Drift Detection & Zero-Trust Governance</p>
+        </div>
+      </div>
+      
+      <div class="system-badges">
+        <div class="badge crypto-badge" id="crypto-badge">
+          <span class="pulse-dot"></span>
+          <span id="crypto-mode-text">Initializing Crypto Vault...</span>
+        </div>
+        <div class="badge ram-badge">
+          <span>RAM:</span>
+          <strong id="ram-usage-text">-- MB</strong>
+          <span class="sub-badge">/ 4GB Budget</span>
+        </div>
+        <button id="reset-btn" class="btn btn-secondary btn-sm" title="Restore pristine enterprise dataset">
+          Reset Dataset
+        </button>
+      </div>
+    </header>
+
+    <!-- Metrics Bar -->
+    <section class="metrics-bar">
+      <div class="metric-card">
+        <span class="metric-label">Monitored Identities</span>
+        <span class="metric-value" id="metric-total-users">--</span>
+      </div>
+      <div class="metric-card metric-warning">
+        <span class="metric-label">Drift Outliers</span>
+        <span class="metric-value" id="metric-outliers">--</span>
+      </div>
+      <div class="metric-card metric-danger">
+        <span class="metric-label">High Risk Violations</span>
+        <span class="metric-value" id="metric-high-risk">--</span>
+      </div>
+      <div class="metric-card metric-success">
+        <span class="metric-label">Zero-Trust Compliant</span>
+        <span class="metric-value" id="metric-clean">--</span>
+      </div>
+    </section>
+
+    <!-- Main Workspace Layout -->
+    <main class="main-content">
+      <!-- Left / Center: Graph Topology & Role Simulator -->
+      <section class="graph-section">
+        <div class="card-header">
+          <div class="card-title-group">
+            <h2 class="card-title">Identity Entitlement Topology</h2>
+            <span class="badge-sub">Force-Directed Graph (Zero-Copy Canvas)</span>
+          </div>
+          <div class="graph-legend">
+            <span class="legend-item"><span class="dot dot-user-safe"></span> Compliant User</span>
+            <span class="legend-item"><span class="dot dot-user-drift"></span> Drifted Superuser</span>
+            <span class="legend-item"><span class="dot dot-perm"></span> Entitlement</span>
+            <span class="legend-item"><span class="line line-drift"></span> Drift Link</span>
+          </div>
+        </div>
+
+        <!-- Canvas Container -->
+        <div class="canvas-wrapper">
+          <canvas id="topology-canvas"></canvas>
+          <div class="canvas-controls">
+            <button id="btn-zoom-in" class="btn btn-icon" title="Zoom In">+</button>
+            <button id="btn-zoom-out" class="btn btn-icon" title="Zoom Out">-</button>
+            <button id="btn-reset-zoom" class="btn btn-icon" title="Reset View">⟲</button>
+          </div>
+          <div id="canvas-hint" class="canvas-hint">
+            Tip: Click any node to inspect details or drag to reposition.
+          </div>
+        </div>
+
+        <!-- Role Simulator Panel -->
+        <div class="simulator-card">
+          <div class="simulator-header">
+            <h3>⚡ Privilege Creep Simulator (Time-Machine)</h3>
+            <p>Promote or transfer an employee to simulate real-time entitlement drift.</p>
+          </div>
+          <div class="simulator-form">
+            <div class="form-group">
+              <label for="sim-user-select">Select Employee:</label>
+              <select id="sim-user-select" class="form-select"></select>
+            </div>
+            <div class="form-group">
+              <label for="sim-role-select">New Role Assignment:</label>
+              <select id="sim-role-select" class="form-select"></select>
+            </div>
+            <button id="btn-simulate-promo" class="btn btn-warning">
+              Simulate Role Transition
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: User Detail & Remediation Panel -->
+      <aside class="sidebar-section">
+        <!-- Identity Inspector -->
+        <div class="card panel-card" id="user-detail-panel">
+          <div class="card-header">
+            <h2 class="card-title">Identity Inspector</h2>
+            <span id="user-status-pill" class="badge-status">Select a node</span>
+          </div>
+
+          <div id="no-user-selected" class="empty-state">
+            <p>Click on an employee node (such as <strong>Bob Vance</strong>) in the graph or select from the roster below to view risk analytics and 1-click remediation.</p>
+          </div>
+
+          <div id="user-selected-content" class="user-content" style="display: none;">
+            <div class="user-profile-header">
+              <div>
+                <h3 id="u-name" class="user-name">--</h3>
+                <p id="u-role-dept" class="user-meta">--</p>
+                <div class="role-history-tags" id="u-history-tags"></div>
+              </div>
+              <div class="risk-gauge-container">
+                <div class="risk-gauge-circle" id="u-risk-circle">
+                  <span id="u-risk-score">0</span>
+                </div>
+                <span class="risk-gauge-label">Risk Score</span>
+              </div>
+            </div>
+
+            <!-- Explainable AI (XAI) Drift Breakdown -->
+            <div class="detail-section">
+              <h4 class="section-title text-danger">⚠️ Anomalous Drift Entitlements (<span id="u-drift-count">0</span>)</h4>
+              <p class="section-help">Permissions retained outside peer-group baseline:</p>
+              <div id="u-drift-list" class="tag-cloud tag-cloud-danger"></div>
+            </div>
+
+            <div class="detail-section">
+              <h4 class="section-title text-success">✓ Authorized Active Entitlements</h4>
+              <div id="u-active-list" class="tag-cloud tag-cloud-success"></div>
+            </div>
+
+            <!-- 1-Click Remediation Action -->
+            <div class="remediation-action-box">
+              <button id="btn-remediate" class="btn btn-danger btn-block btn-lg">
+                🛡️ 1-Click Auto-Remediate Access
+              </button>
+              <p class="remediation-help">Immediately severs unauthorized links, recalibrates score, and creates CPACF audit block.</p>
+            </div>
+
+            <!-- Generated IAM Policy / RACF View -->
+            <div class="detail-section" id="policy-output-section" style="display: none;">
+              <div class="tab-header">
+                <button class="tab-btn active" id="tab-btn-aws">AWS IAM JSON Policy</button>
+                <button class="tab-btn" id="tab-btn-racf">IBM RACF Script</button>
+              </div>
+              <pre id="policy-code-block" class="code-block"></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Audit Ledger Preview Card -->
+        <div class="card panel-card audit-card">
+          <div class="card-header">
+            <h2 class="card-title">CPACF Audit Hash Chain</h2>
+            <span class="badge-sub" id="ledger-count">0 Blocks</span>
+          </div>
+          <div class="audit-stream" id="audit-stream"></div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
