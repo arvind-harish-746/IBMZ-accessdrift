@@ -17,3 +17,7 @@ htmlcov/
 node_modules/
 dist/
 .DS_Store
+
+# Planning docs
+IMPLEMENTATION_PLAN.md
+
