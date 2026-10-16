@@ -6,7 +6,35 @@
 
 ---
 
-## 🚀 Quickstart Guide
+## 🚀 Run Locally Using Docker
+
+### Prerequisites
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- Git
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
+cd YOUR_REPOSITORY
+```
+
+### 2. Start the application
+```bash
+docker compose up --build
+```
+
+### 3. Access the application
+Once all containers have started, open your browser:
+- Application: [http://localhost:8000](http://localhost:8000/)
+
+### 4. Stop the application
+```bash
+docker compose down
+```
+
+---
+
+## 💻 Alternative: Run Locally Using Python Scripts
 
 ### 1. Prerequisites
 - Python 3.11+ or 3.12+ (standard Linux distribution)
@@ -29,9 +57,34 @@
 * Configured for zero-overhead performance (`--workers 1`, `--timeout-keep-alive 30`).
 * Consumes **< 60MB RAM**, leaving over 3.9GB RAM free on your Linux system.
 
-
 ### 3. Access Dashboard
 Open your browser at: **`http://localhost:8000`**
+
+---
+
+## 🛠️ Technologies Used
+
+### Infrastructure & Containerization
+- **Docker**: Multi-architecture containerization (`x86_64`, `aarch64`, `s390x` IBM Z) running under an unprivileged least-privilege user (`appuser`).
+- **Docker Compose**: Container lifecycle orchestration, automated health checks, and resource controls.
+
+### Backend & Core Logic
+- **Python 3.11+**: Core runtime environment.
+- **FastAPI**: Modern, high-performance async web framework for REST API endpoints and automatic OpenAPI schema generation.
+- **Uvicorn**: Ultra-lean ASGI web server with minimal memory footprint (<60MB RSS).
+- **Pydantic (v2)**: Strict data modeling, schema validation, and zero-trust payload enforcement.
+- **NumPy**: Vectorized divergence calculations, matrix operations, and zero-safe cosine drift computation.
+- **Cryptography (pyca/cryptography)**: Enterprise-grade OpenSSL cryptographic bindings (AES-GCM encryption & SHA-256 HMAC).
+- **HTTPX**: Asynchronous HTTP client for test suite automation and endpoint verification.
+
+### Enterprise Security & Acceleration
+- **IBM Z CPACF Hardware Acceleration**: Native hardware crypto instructions on `s390x` mainframes with seamless OpenSSL fallback.
+- **Tamper-Evident Cryptographic Ledger**: SHA-256 hash-chained immutable audit log for all remediation events.
+- **Zero-Safe Vector Engine**: Mathematical divergence calculation resilient to empty profile vectors ($\|v_i\| = 0$) and division-by-zero edge cases.
+
+### Frontend Dashboard
+- **HTML5 & Vanilla CSS3**: Custom modern cyber-security dark theme with glassmorphism, responsive metrics, and zero external CSS bloat.
+- **Vanilla JavaScript (ES6+)**: Real-time event handling, interactive entitlement simulation, dynamic drift visualization, and remediation workflows.
 
 ---
 
