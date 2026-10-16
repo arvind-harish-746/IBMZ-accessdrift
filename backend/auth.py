@@ -154,6 +154,14 @@ PRESENTATION_PERSONAS = [
 
 # Pre-seeded enterprise governance accounts
 ENTERPRISE_USERS: Dict[str, Dict[str, Any]] = {
+    "trail_demo_ceo": {
+        "username": "trail_demo_ceo",
+        "name": "Victoria Sterling",
+        "password_hash": hash_password("trail_demo"),
+        "role": "EXECUTIVE",
+        "department": "Executive Leadership",
+        "permissions": ROLES_PERMISSIONS["EXECUTIVE"]["capabilities"],
+    },
     "ceo": {
         "username": "ceo",
         "name": "Victoria Sterling",
