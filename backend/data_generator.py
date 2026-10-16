@@ -279,4 +279,22 @@ def get_initial_dataset() -> List[Dict[str, Any]]:
             "role_history": ["People Operations Manager"]
         }
     ]
+
+    dept_to_branch = {
+        "Engineering": "Global HQ - New York",
+        "Finance": "EMEA Operations - London",
+        "HR": "APAC Tech Hub - Singapore",
+        "DevOps": "IBM Z Systems Lab - Poughkeepsie",
+    }
+    for u in users:
+        u.setdefault("branch", dept_to_branch.get(u.get("department"), "Global HQ - New York"))
+
     return users
+
+
+ENTERPRISE_BRANCHES = [
+    "Global HQ - New York",
+    "EMEA Operations - London",
+    "APAC Tech Hub - Singapore",
+    "IBM Z Systems Lab - Poughkeepsie",
+]

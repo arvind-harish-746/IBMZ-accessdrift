@@ -21,3 +21,7 @@ dist/
 # Planning docs
 IMPLEMENTATION_PLAN.md
 
+# Datasets & ML Training Scripts (Model artifacts in backend/models/ are preserved)
+datasets/
+backend/training/
+

@@ -7,6 +7,7 @@ import math
 import numpy as np
 from typing import List, Dict, Any, Tuple
 from .data_generator import ALL_PERMISSIONS, CRITICAL_PERMISSIONS, ROLE_BASELINES
+from .ml_service import ml_service
 
 
 class AnomalyEngine:
@@ -108,14 +109,15 @@ class AnomalyEngine:
             if p in CRITICAL_PERMISSIONS:
                 alpha = max(alpha, CRITICAL_PERMISSIONS[p])
 
-        # Clamped Risk Score: max(0, min(100, floor(Distance * 100 * alpha)))
-        raw_score = math.floor(distance * 100.0 * alpha)
-        
-        # Extra penalty if user holds critical unauthorized admin rights
-        if drift_perms and any(p in CRITICAL_PERMISSIONS for p in drift_perms):
-            raw_score = max(raw_score, 75)
-            
-        clamped_score = max(0, min(100, raw_score))
+        # Clamped Risk Score: Use trained Phase 2 Isolation Forest ML model
+        ml_pred = ml_service.predict_user(user) if ml_service.is_loaded else None
+        if ml_pred and ml_pred.get("model_status") == "LOADED":
+            clamped_score = ml_pred["risk_score"]
+        else:
+            raw_score = math.floor(distance * 100.0 * alpha)
+            if drift_perms and any(p in CRITICAL_PERMISSIONS for p in drift_perms):
+                raw_score = max(raw_score, 75)
+            clamped_score = max(0, min(100, raw_score))
         
         return clamped_score, distance, drift_perms, missing_perms, alpha
 
@@ -125,6 +127,7 @@ class AnomalyEngine:
     ) -> Dict[str, Any]:
         """
         Processes entire roster, computes centroids, generates graph topology contracts.
+        Uses Phase 2 Isolation Forest ML model for anomaly detection.
         """
         centroids = self.compute_role_centroids(users)
         
@@ -133,16 +136,24 @@ class AnomalyEngine:
             centroid = centroids.get(u["role"], np.zeros(self.num_perms, dtype=np.float32))
             score, dist, drift_p, missing_p, alpha = self.calculate_user_risk(u, centroid)
             
-            is_outlier = (score >= 40) or (len(drift_p) > 0)
+            ml_pred = ml_service.predict_user(u) if ml_service.is_loaded else None
+            if ml_pred and ml_pred.get("model_status") == "LOADED":
+                is_outlier = ml_pred["is_outlier"] or (len(drift_p) > 0)
+                anomaly_score = ml_pred["anomaly_score"]
+            else:
+                is_outlier = (score >= 40) or (len(drift_p) > 0)
+                anomaly_score = round(dist, 4)
             
             analyzed_users.append({
                 "id": u["id"],
                 "name": u["name"],
                 "role": u["role"],
                 "department": u["department"],
+                "branch": u.get("branch", "Global HQ - New York"),
                 "permissions": u["permissions"],
                 "role_history": u.get("role_history", [u["role"]]),
                 "risk_score": score,
+                "anomaly_score": anomaly_score,
                 "cosine_distance": round(dist, 4),
                 "is_outlier": is_outlier,
                 "drift_permissions": drift_p,
@@ -162,6 +173,7 @@ class AnomalyEngine:
                 "type": "user",
                 "role": u["role"],
                 "department": u["department"],
+                "branch": u.get("branch", "Global HQ - New York"),
                 "risk_score": u["risk_score"],
                 "is_outlier": u["is_outlier"],
                 "drift_count": len(u["drift_permissions"])
