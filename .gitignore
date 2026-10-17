@@ -25,3 +25,8 @@ IMPLEMENTATION_PLAN.md
 datasets/
 backend/training/
 
+# Private SSH Keys & Credentials
+*.pem
+Key1.pem
+
+
