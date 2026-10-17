@@ -62,12 +62,41 @@ function updateUserUI() {
   const u = state.currentUser;
   if (!u) return;
 
-  document.getElementById('current-user-name').textContent = u.name;
-  document.getElementById('current-user-role-badge').textContent = u.role;
-  document.getElementById('current-user-dept').textContent = u.department;
+  const greetingEl = document.getElementById('greeting-user-name');
+  if (greetingEl) {
+    const firstName = u.name ? u.name.split(' ')[0] : 'Victoria';
+    greetingEl.textContent = `Hi, ${firstName}`;
+  }
 
-  const initials = u.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-  document.getElementById('current-user-avatar').textContent = initials;
+  const nameEl = document.getElementById('current-user-name');
+  if (nameEl) nameEl.textContent = u.name;
+  const roleEl = document.getElementById('current-user-role-badge');
+  if (roleEl) roleEl.textContent = u.role;
+  const deptEl = document.getElementById('current-user-dept');
+  if (deptEl) deptEl.textContent = u.department;
+
+  const initials = u.name ? u.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'VS';
+  const avatarEl = document.getElementById('current-user-avatar');
+  if (avatarEl) avatarEl.textContent = initials;
+}
+
+function updateMetricsRibbon(summary) {
+  if (!summary) return;
+  const total = document.getElementById('metric-total-users');
+  if (total) total.textContent = summary.total_users || 0;
+  const outliers = document.getElementById('metric-outliers');
+  if (outliers) outliers.textContent = summary.outliers_detected || 0;
+  const highRisk = document.getElementById('metric-high-risk');
+  if (highRisk) highRisk.textContent = summary.high_risk_users || 0;
+
+  const pct = summary.total_users > 0 
+    ? Math.round((summary.clean_users / summary.total_users) * 100) 
+    : 100;
+  const cleanPct = document.getElementById('metric-clean-pct');
+  if (cleanPct) cleanPct.textContent = `${pct}% Zero-Trust Compliant`;
+
+  const branchCount = document.getElementById('metric-branches-count');
+  if (branchCount) branchCount.textContent = `Across ${state.branches.length || 5} Global Branches`;
 }
 
 export async function loadEnterpriseData() {
@@ -77,14 +106,16 @@ export async function loadEnterpriseData() {
     state.branches = branchesData.branches || [];
 
     const branchSelect = document.getElementById('branch-select');
-    branchSelect.innerHTML = '<option value="all">🌐 Global Enterprise (All Branches)</option>';
-    state.branches.forEach(b => {
-      const opt = document.createElement('option');
-      opt.value = b.branch;
-      opt.textContent = `${b.branch} (${b.total_employees} staff, ${b.outliers_detected} outliers)`;
-      branchSelect.appendChild(opt);
-    });
-    branchSelect.value = state.selectedBranch;
+    if (branchSelect) {
+      branchSelect.innerHTML = '<option value="all">🌐 Global Enterprise (All Branches)</option>';
+      state.branches.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.branch;
+        opt.textContent = `${b.branch} (${b.total_employees} staff, ${b.outliers_detected} outliers)`;
+        branchSelect.appendChild(opt);
+      });
+      branchSelect.value = state.selectedBranch;
+    }
 
     // Populate modal branch selectors
     ['csv-branch-select', 'new-emp-branch'].forEach(id => {
@@ -116,15 +147,21 @@ export async function loadEnterpriseData() {
     const topoData = await api.getTopology(state.selectedBranch);
     loadTopologyData(topoData.nodes || [], topoData.links || []);
 
-    document.getElementById('graph-scope-badge').textContent = state.selectedBranch === 'all'
-      ? 'Global Enterprise'
-      : state.selectedBranch;
-    document.getElementById('graph-nodes-count').textContent = `${(topoData.nodes || []).length} Nodes`;
+    const scopeBadge = document.getElementById('graph-scope-badge');
+    if (scopeBadge) {
+      scopeBadge.textContent = state.selectedBranch === 'all'
+        ? 'Global Enterprise'
+        : state.selectedBranch;
+    }
+    const nodesCount = document.getElementById('graph-nodes-count');
+    if (nodesCount) {
+      nodesCount.textContent = `${(topoData.nodes || []).length} Nodes`;
+    }
 
     // 4. Default user selection (e.g. Bob Vance in demo or first user)
     if (state.users.length > 0) {
       if (!state.selectedUserId || !state.users.some(u => u.id === state.selectedUserId)) {
-        const bob = state.users.find(u => u.name.includes("Bob Vance"));
+        const bob = state.users.find(u => u.name && u.name.includes("Bob Vance"));
         selectUser(bob ? bob.id : state.users[0].id, loadEnterpriseData);
       } else {
         selectUser(state.selectedUserId, loadEnterpriseData);
@@ -137,19 +174,6 @@ export async function loadEnterpriseData() {
   } catch (err) {
     console.error("Failed to load enterprise data:", err);
   }
-}
-
-function updateMetricsRibbon(summary) {
-  if (!summary) return;
-  document.getElementById('metric-total-users').textContent = summary.total_users || 0;
-  document.getElementById('metric-outliers').textContent = summary.outliers_detected || 0;
-  document.getElementById('metric-high-risk').textContent = summary.high_risk_users || 0;
-  document.getElementById('metric-clean').textContent = summary.clean_users || 0;
-
-  const pct = summary.total_users > 0 
-    ? Math.round((summary.clean_users / summary.total_users) * 100) 
-    : 100;
-  document.getElementById('metric-clean-pct').textContent = `${pct}% Compliant`;
 }
 
 function populateRoleDropdowns() {
@@ -219,33 +243,32 @@ function populateRoleDropdowns() {
 async function pollSystemHealth() {
   try {
     const health = await api.getHealth();
-    document.getElementById('ram-usage-text').textContent = `${health.memory_rss_mb} MB`;
-    document.getElementById('crypto-mode-text').textContent = health.crypto_mode;
-    document.getElementById('footer-crypto-mode').textContent = health.crypto_mode;
+    const ramEl = document.getElementById('ram-usage-text');
+    if (ramEl) ramEl.textContent = `${health.memory_rss_mb} MB`;
+    const cryptoEl = document.getElementById('crypto-mode-text');
+    if (cryptoEl) cryptoEl.textContent = health.crypto_mode;
   } catch (e) {}
 }
 
 function setupGlobalEventListeners() {
   // Sign Out
-  document.getElementById('btn-header-signout')?.addEventListener('click', () => {
+  const handleSignOut = () => {
     signOut(async (isDemo) => {
       showDashboardView();
       await loadEnterpriseData();
     });
-  });
+  };
+  document.getElementById('btn-header-signout')?.addEventListener('click', handleSignOut);
+  document.getElementById('btn-rail-signout')?.addEventListener('click', handleSignOut);
 
-  // Branch selector
+  // Branch selector menu
   document.getElementById('branch-select')?.addEventListener('change', (e) => {
     state.selectedBranch = e.target.value;
     loadEnterpriseData();
+    showToast(`Switched view to branch: ${e.target.value}`, 'info');
   });
 
-  // Add Branch prompt button
-  document.getElementById('btn-add-branch-quick')?.addEventListener('click', () => {
-    promptAddBranch(loadEnterpriseData);
-  });
-
-  // Switch to demo dataset button in header
+  // Switch to demo dataset button
   document.getElementById('btn-switch-demo')?.addEventListener('click', async () => {
     try {
       await api.loadDemoWorkspace();
@@ -257,21 +280,73 @@ function setupGlobalEventListeners() {
     }
   });
 
-  // Reset Demo
-  document.getElementById('reset-btn')?.addEventListener('click', async () => {
-    if (!confirm("Reset enterprise dataset to initial demo state?")) return;
-    try {
-      await api.resetDemo();
-      showToast("Dataset reset to clean demo baseline", "success");
-      await loadEnterpriseData();
-    } catch (err) {
-      showToast(`Reset failed: ${err.message}`, "error");
+  // Ingest Modal & Staff buttons
+  document.getElementById('btn-open-ingest-modal')?.addEventListener('click', () => {
+    openModal('ingest-modal');
+    document.getElementById('modal-tab-csv')?.click();
+  });
+  document.getElementById('btn-quick-add-staff')?.addEventListener('click', () => {
+    openModal('ingest-modal');
+    document.getElementById('modal-tab-manual')?.click();
+  });
+
+  // Top Pastel Card actions
+  document.getElementById('btn-card-inspect')?.addEventListener('click', () => {
+    const outlier = state.users.find(u => u.is_outlier || u.risk_score >= 70);
+    if (outlier) {
+      selectUser(outlier.id, loadEnterpriseData);
+      showToast(`Inspecting critical drift for ${outlier.name}`, 'info');
     }
   });
 
-  // Remediation
-  document.getElementById('btn-remediate')?.addEventListener('click', () => {
+  document.getElementById('btn-card-roster')?.addEventListener('click', () => {
+    document.getElementById('table-card-section')?.scrollIntoView({ behavior: 'smooth' });
+  });
+
+  document.getElementById('btn-card-remediate')?.addEventListener('click', () => {
     executeRemediation(loadEnterpriseData);
+  });
+
+  // Right Inspector Profile buttons
+  document.getElementById('btn-profile-remediate')?.addEventListener('click', () => {
+    executeRemediation(loadEnterpriseData);
+  });
+  document.getElementById('btn-remediate-now')?.addEventListener('click', () => {
+    executeRemediation(loadEnterpriseData);
+  });
+  // Player Waveform Buttons
+  document.getElementById('btn-player-play')?.addEventListener('click', () => {
+    executeRemediation(loadEnterpriseData);
+  });
+  document.getElementById('btn-player-forward')?.addEventListener('click', () => {
+    openModal('simulator-modal');
+    const simUserSelect = document.getElementById('sim-modal-user-select');
+    if (simUserSelect && state.selectedUserId) simUserSelect.value = state.selectedUserId;
+    showToast('Select promotion target for employee', 'info');
+  });
+  document.getElementById('btn-player-rewind')?.addEventListener('click', () => {
+    if (state.selectedUserId) {
+      selectUser(state.selectedUserId, loadEnterpriseData);
+      showToast('Reset view for selected employee', 'info');
+    }
+  });
+
+  // Table Select All Checkbox
+  document.getElementById('select-all-checkbox')?.addEventListener('change', (e) => {
+    const isChecked = e.target.checked;
+    document.querySelectorAll('.table-checkbox').forEach(cb => cb.checked = isChecked);
+  });
+
+  document.getElementById('btn-profile-star')?.addEventListener('click', () => {
+    showToast('Employee bookmarked for periodic governance review', 'success');
+  });
+  document.getElementById('btn-profile-explain')?.addEventListener('click', () => {
+    showToast('Explainable AI: Isolation Forest τ = 0.055, 12 IAM features analyzed', 'info');
+  });
+
+  // Notifications Pill
+  document.getElementById('btn-notifications-pill')?.addEventListener('click', () => {
+    showToast(`System active: ${state.summary.outliers_detected || 0} drift alerts detected across ${state.branches.length} branches.`, 'info');
   });
 
   // Dual Policy tabs
@@ -302,25 +377,33 @@ function setupGlobalEventListeners() {
     state.activeView = 'graph';
     document.getElementById('tab-view-graph').classList.add('active');
     document.getElementById('tab-view-table').classList.remove('active');
-    document.getElementById('graph-view-container').style.display = 'flex';
-    document.getElementById('table-view-container').style.display = 'none';
+    document.getElementById('graph-view-container').style.display = 'block';
     drawFrame();
   });
 
   document.getElementById('tab-view-table')?.addEventListener('click', () => {
-    state.activeView = 'table';
-    document.getElementById('tab-view-table').classList.add('active');
-    document.getElementById('tab-view-graph').classList.remove('active');
-    document.getElementById('graph-view-container').style.display = 'none';
-    document.getElementById('table-view-container').style.display = 'flex';
-    renderRosterTable((userId) => selectUser(userId, loadEnterpriseData));
+    document.getElementById('table-card-section')?.scrollIntoView({ behavior: 'smooth' });
+  });
+
+  // Canvas Viewport Controls
+  document.getElementById('btn-reset-zoom')?.addEventListener('click', () => {
+    state.scale = 1.0;
+    state.panX = 0;
+    state.panY = 0;
+    drawFrame();
+  });
+
+  document.getElementById('btn-toggle-physics')?.addEventListener('click', (e) => {
+    state.isPhysicsFrozen = !state.isPhysicsFrozen;
+    e.target.textContent = state.isPhysicsFrozen ? '▶ Resume' : '⏸ Pause';
+    if (!state.isPhysicsFrozen) drawFrame();
   });
 
   // Search input
   document.getElementById('node-search-input')?.addEventListener('input', (e) => {
     state.searchQuery = e.target.value;
-    if (state.activeView === 'table') renderRosterTable((userId) => selectUser(userId, loadEnterpriseData));
-    else drawFrame();
+    renderRosterTable((userId) => selectUser(userId, loadEnterpriseData));
+    drawFrame();
   });
 
   // Table filters
@@ -334,40 +417,47 @@ function setupGlobalEventListeners() {
     renderRosterTable((userId) => selectUser(userId, loadEnterpriseData));
   });
 
-  // Modals triggers
-  document.getElementById('btn-open-ingest-modal')?.addEventListener('click', () => openModal('ingest-modal'));
-  document.getElementById('btn-open-simulator-modal')?.addEventListener('click', () => {
-    openModal('simulator-modal');
-    const simUserSelect = document.getElementById('sim-modal-user-select');
-    if (simUserSelect && state.selectedUserId) simUserSelect.value = state.selectedUserId;
+  // Left Rail Navigation Buttons
+  document.getElementById('rail-btn-overview')?.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   });
-
-  document.getElementById('btn-view-ledger')?.addEventListener('click', () => {
+  document.getElementById('rail-btn-graph')?.addEventListener('click', () => {
+    document.getElementById('graph-view-container')?.scrollIntoView({ behavior: 'smooth' });
+  });
+  document.getElementById('rail-btn-roster')?.addEventListener('click', () => {
+    document.getElementById('table-card-section')?.scrollIntoView({ behavior: 'smooth' });
+  });
+  document.getElementById('rail-btn-ledger')?.addEventListener('click', () => {
     openModal('ledger-modal');
     loadLedgerBlocks();
   });
-
-  document.getElementById('btn-delete-this-user')?.addEventListener('click', async () => {
-    if (!state.selectedUserId) return;
-    const user = state.users.find(u => u.id === state.selectedUserId);
-    const name = user ? user.name : state.selectedUserId;
-
-    if (!confirm(`Remove employee "${name}" (${state.selectedUserId}) from active roster?`)) return;
-
+  document.getElementById('rail-btn-telemetry')?.addEventListener('click', async () => {
     try {
-      await api.deleteEmployee(state.selectedUserId);
-      showToast(`Removed employee ${name}`, 'info');
-      state.selectedUserId = null;
-      await loadEnterpriseData();
-    } catch (err) {
-      showToast(`Delete failed: ${err.message}`, 'error');
+      const health = await api.getHealth();
+      showToast(`IBM Z Status: ${health.status} &bull; RAM: ${health.memory_rss_mb} MB / 4GB &bull; ${health.crypto_mode}`, 'info');
+    } catch (e) {
+      showToast('Telemetry probe running...', 'info');
     }
   });
 
-  document.getElementById('btn-simulate-this-user')?.addEventListener('click', () => {
-    openModal('simulator-modal');
-    const simUserSelect = document.getElementById('sim-modal-user-select');
-    if (simUserSelect && state.selectedUserId) simUserSelect.value = state.selectedUserId;
+  // Global Drag & Drop CSV onto window
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      const isCsv = file.name.toLowerCase().endsWith('.csv') || file.type.includes('csv') || file.type.includes('text');
+      if (isCsv) {
+        openModal('ingest-modal');
+        const fileInput = document.getElementById('csv-file-input');
+        if (fileInput) {
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          fileInput.files = dt.files;
+          fileInput.dispatchEvent(new Event('change'));
+        }
+      }
+    }
   });
 }
 

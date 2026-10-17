@@ -193,11 +193,11 @@ export function drawFrame() {
     ctx.lineTo(b.x, b.y);
 
     if (link.is_drift) {
-      ctx.strokeStyle = '#da1e28';
-      ctx.lineWidth = isHighlight ? 2.8 : 1.8;
+      ctx.strokeStyle = '#EF4444';
+      ctx.lineWidth = isHighlight ? 2.6 : 1.6;
       ctx.setLineDash([5, 4]);
     } else {
-      ctx.strokeStyle = isHighlight ? 'rgba(0, 229, 255, 0.7)' : 'rgba(70, 95, 135, 0.35)';
+      ctx.strokeStyle = isHighlight ? 'rgba(2, 132, 199, 0.85)' : 'rgba(203, 213, 225, 0.75)';
       ctx.lineWidth = isHighlight ? 1.6 : 1.0;
       ctx.setLineDash([]);
     }
@@ -205,7 +205,7 @@ export function drawFrame() {
   }
   ctx.setLineDash([]);
 
-  // 2. Draw Nodes (Pre-rendered shapes, no expensive shadowBlur)
+  // 2. Draw Nodes (Pre-rendered shapes)
   for (const node of nodes) {
     const isSelected = state.selectedUserId === node.id;
     const isHovered = state.hoveredNode === node;
@@ -216,8 +216,8 @@ export function drawFrame() {
 
     if (node.type === 'permission') {
       // Permission Node: Diamond
-      const size = node.is_critical ? 12 : 9;
-      ctx.fillStyle = node.is_critical ? '#f59e0b' : '#00e5ff';
+      const size = node.is_critical ? 11 : 8.5;
+      ctx.fillStyle = node.is_critical ? '#D97706' : '#0284C7';
 
       ctx.beginPath();
       ctx.moveTo(node.x, node.y - size);
@@ -227,23 +227,23 @@ export function drawFrame() {
       ctx.closePath();
       ctx.fill();
 
-      ctx.strokeStyle = isSelected || isHovered ? '#fff' : 'rgba(255, 255, 255, 0.25)';
+      ctx.strokeStyle = isSelected || isHovered ? '#1E2024' : '#FFFFFF';
       ctx.lineWidth = isSelected ? 2 : 1;
       ctx.stroke();
 
-      ctx.fillStyle = isHovered || isSelected ? '#fff' : '#94a3b8';
+      ctx.fillStyle = isHovered || isSelected ? '#1E2024' : '#64748B';
       ctx.font = '9.5px monospace';
       ctx.fillText(node.name, node.x + 11, node.y + 3);
 
     } else {
       // User Node: Circle
-      const radius = isSelected ? 13 : (node.is_outlier ? 9.5 : 7.5);
+      const radius = isSelected ? 12 : (node.is_outlier ? 9 : 7);
 
-      // Warning ring for drift outliers (cheap concentric ring, NO shadowBlur!)
+      // Warning ring for drift outliers
       if (node.is_outlier) {
         ctx.beginPath();
         ctx.arc(node.x, node.y, radius + 4, 0, 2 * Math.PI);
-        ctx.fillStyle = 'rgba(218, 30, 40, 0.25)';
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
         ctx.fill();
       }
 
@@ -251,24 +251,24 @@ export function drawFrame() {
       ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
 
       if (node.risk_score >= 70) {
-        ctx.fillStyle = '#da1e28';
+        ctx.fillStyle = '#EF4444';
       } else if (node.risk_score >= 40) {
-        ctx.fillStyle = '#f59e0b';
+        ctx.fillStyle = '#F59E0B';
       } else {
-        ctx.fillStyle = '#10b981';
+        ctx.fillStyle = '#10B981';
       }
       ctx.fill();
 
-      // White outline for selection or search
+      // Outline for selection or search
       if (isSelected || matchesSearch) {
         ctx.beginPath();
         ctx.arc(node.x, node.y, radius + 2.5, 0, 2 * Math.PI);
-        ctx.strokeStyle = '#fff';
+        ctx.strokeStyle = '#1E2024';
         ctx.lineWidth = 2;
         ctx.stroke();
       }
 
-      ctx.fillStyle = isSelected ? '#fff' : '#cbd5e1';
+      ctx.fillStyle = isSelected ? '#0F172A' : '#334155';
       ctx.font = isSelected ? 'bold 11px sans-serif' : '10px sans-serif';
       ctx.fillText(node.name, node.x + 12, node.y + 3.5);
     }

@@ -535,43 +535,82 @@ async def upload_employee_csv(
     file: UploadFile = File(...),
     branch: Optional[str] = Form(None),
     replace_roster: bool = Form(False),
-    current_user: Dict[str, Any] = Depends(require_roles(["ADMIN", "EXECUTIVE"]))
+    current_user: Dict[str, Any] = Depends(require_roles(["ADMIN", "EXECUTIVE", "SECURITY_ANALYST"]))
 ):
     """
     Enterprise Batch Ingestion via CSV Upload.
     Parses corporate IAM spreadsheet, applies ML Anomaly Scoring, and incorporates records into active governance roster.
-    Requires ADMIN or EXECUTIVE role.
+    Requires ADMIN, EXECUTIVE, or SECURITY_ANALYST role.
     """
     global users_db
     try:
         contents = await file.read()
         text = contents.decode("utf-8-sig", errors="replace")
         
-        # Detect delimiter (comma or semicolon)
-        delimiter = ";" if ";" in text.split("\n")[0] and "," not in text.split("\n")[0] else ","
+        # Clean lines and detect delimiter
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if not lines:
+            raise HTTPException(status_code=400, detail="Uploaded CSV file is empty.")
+            
+        first_line = lines[0]
+        if "\t" in first_line:
+            delimiter = "\t"
+        elif ";" in first_line and "," not in first_line:
+            delimiter = ";"
+        else:
+            delimiter = ","
+
         reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
         
         imported_records = []
-        for row in reader:
-            user_id = row.get("id") or row.get("user_id") or f"usr_{secrets.token_hex(3)}"
-            name = row.get("name") or row.get("full_name") or f"Employee {user_id}"
-            role = row.get("role") or "Senior Software Engineer"
-            department = row.get("department") or (
+        for raw_row in reader:
+            if not raw_row or not any(raw_row.values()):
+                continue
+
+            # Normalize keys to lowercase stripped strings without spaces or hyphens
+            row = {
+                str(k).strip().lower().replace(" ", "_").replace("-", "_"): str(v).strip()
+                for k, v in raw_row.items()
+                if k is not None and v is not None
+            }
+
+            user_id = (
+                row.get("id") or row.get("user_id") or row.get("userid") or
+                row.get("employee_id") or row.get("emp_id") or f"usr_{secrets.token_hex(3)}"
+            )
+            name = (
+                row.get("name") or row.get("full_name") or row.get("fullname") or
+                row.get("employee_name") or f"Employee {user_id}"
+            )
+            role = (
+                row.get("role") or row.get("job_title") or row.get("title") or
+                "Senior Software Engineer"
+            )
+            department = (
+                row.get("department") or row.get("dept") or
                 ROLE_BASELINES.get(role, {}).get("department", "Engineering")
             )
-            user_branch = branch or row.get("branch") or "Global HQ - New York"
+            user_branch = branch or row.get("branch") or row.get("location") or row.get("office") or "Global HQ - New York"
             
-            # Parse permissions field (comma, pipe, or JSON list)
-            raw_perms = row.get("permissions") or ""
-            if raw_perms.startswith("[") and raw_perms.endswith("]"):
-                try:
-                    perms = json.loads(raw_perms)
-                except Exception:
-                    perms = [p.strip() for p in raw_perms.replace("[", "").replace("]", "").replace("\"", "").split(",") if p.strip()]
-            elif "|" in raw_perms:
-                perms = [p.strip() for p in raw_perms.split("|") if p.strip()]
-            else:
-                perms = [p.strip() for p in raw_perms.split(",") if p.strip()]
+            # Parse permissions field (JSON list, Python repr list, pipe, semicolon, or comma)
+            raw_perms = row.get("permissions") or row.get("permission") or row.get("entitlements") or ""
+            perms = []
+            if raw_perms:
+                raw_perms = raw_perms.strip()
+                if (raw_perms.startswith("[") and raw_perms.endswith("]")) or (raw_perms.startswith("(") and raw_perms.endswith(")")):
+                    try:
+                        perms = json.loads(raw_perms)
+                    except Exception:
+                        cleaned = raw_perms.strip("[]()\"' ")
+                        perms = [p.strip().strip("\"'") for p in cleaned.split(",") if p.strip()]
+                elif "|" in raw_perms:
+                    perms = [p.strip().strip("\"'") for p in raw_perms.split("|") if p.strip()]
+                elif ";" in raw_perms:
+                    perms = [p.strip().strip("\"'") for p in raw_perms.split(";") if p.strip()]
+                elif "," in raw_perms:
+                    perms = [p.strip().strip("\"'") for p in raw_perms.split(",") if p.strip()]
+                else:
+                    perms = [raw_perms.strip().strip("\"'")]
 
             if not perms and role in ROLE_BASELINES:
                 perms = list(ROLE_BASELINES[role]["baseline_permissions"])

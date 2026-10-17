@@ -77,13 +77,35 @@ function setupCsvUpload() {
   });
 
   function handleFile(file) {
-    if (!file.name.endsWith('.csv')) {
-      showToast('Please select a valid .csv file', 'error');
+    if (!file) return;
+    const nameLower = file.name.toLowerCase();
+    const isCsv = nameLower.endsWith('.csv') ||
+                  file.type.includes('csv') ||
+                  file.type.includes('excel') ||
+                  file.type.includes('text/plain') ||
+                  nameLower.endsWith('.txt');
+                  
+    if (!isCsv) {
+      showToast('Please select a valid CSV file (.csv)', 'error');
       return;
     }
     selectedFile = file;
-    filenameDisplay.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-    submitBtn.disabled = false;
+    
+    // Read first few lines to give immediate row count preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const validLines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+        const recordEst = Math.max(0, validLines.length - 1);
+        filenameDisplay.innerHTML = `<strong>${escapeHtml(file.name)}</strong> <span style="color:#0284C7;">(${(file.size / 1024).toFixed(1)} KB &bull; ~${recordEst} records detected)</span>`;
+      } catch (err) {
+        filenameDisplay.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+      }
+      submitBtn.disabled = false;
+      showToast(`Ready to ingest: ${file.name}`, 'info');
+    };
+    reader.readAsText(file.slice(0, 50000)); // preview sample
   }
 
   submitBtn?.addEventListener('click', async () => {
@@ -92,9 +114,9 @@ function setupCsvUpload() {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Parsing & ML Scoring...';
 
-    const branch = document.getElementById('csv-branch-select').value;
-    const mode = document.querySelector('input[name="csv-mode"]:checked').value;
-    const replaceRoster = mode === 'replace';
+    const branch = document.getElementById('csv-branch-select') ? document.getElementById('csv-branch-select').value : null;
+    const modeEl = document.querySelector('input[name="csv-mode"]:checked');
+    const replaceRoster = modeEl ? modeEl.value === 'replace' : false;
 
     const formData = new FormData();
     formData.append('file', selectedFile);
@@ -105,6 +127,7 @@ function setupCsvUpload() {
       const result = await api.uploadCsv(formData);
       showToast(`Ingested ${result.records_processed} employee records! Detected ${result.outliers_detected} outliers.`, 'success');
       closeModal('ingest-modal');
+      selectedFile = null;
       if (onDataChangeCallback) onDataChangeCallback();
     } catch (err) {
       showToast(`Upload failed: ${err.message}`, 'error');
@@ -183,16 +206,23 @@ function setupAddEmployeeForm() {
 }
 
 function setupSimulatorForm() {
-  const form = document.getElementById('sim-modal-form');
+  const form = document.getElementById('sim-modal-form') || document.getElementById('simulator-form');
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const userId = document.getElementById('sim-modal-user-select').value;
-    const newRole = document.getElementById('sim-modal-role-select').value;
-    const newDept = document.getElementById('sim-modal-dept-input').value;
+    const userSelect = document.getElementById('sim-modal-user-select');
+    const roleSelect = document.getElementById('sim-modal-role-select');
+    const deptInput = document.getElementById('sim-modal-dept-input');
+    const btn = document.getElementById('btn-modal-run-sim') || form.querySelector('button[type="submit"]');
 
-    const btn = document.getElementById('btn-modal-run-sim');
-    btn.disabled = true;
-    btn.textContent = 'Simulating Transition...';
+    if (!userSelect || !roleSelect) return;
+    const userId = userSelect.value;
+    const newRole = roleSelect.value;
+    const newDept = deptInput ? deptInput.value : '';
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Simulating Transition...';
+    }
 
     try {
       const data = await api.simulateRoleChange(userId, newRole, newDept);
@@ -203,8 +233,10 @@ function setupSimulatorForm() {
     } catch (err) {
       showToast(`Simulation failed: ${err.message}`, 'error');
     } finally {
-      btn.disabled = false;
-      btn.textContent = '⚡ Execute Simulation & Score';
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '⚡ Simulate Promotion';
+      }
     }
   });
 }
@@ -216,29 +248,57 @@ function setupLedgerModal() {
 export async function loadLedgerBlocks() {
   try {
     const data = await api.getAuditLedger();
-    document.getElementById('modal-ledger-total-blocks').textContent = `${data.total_blocks} Blocks`;
-    document.getElementById('modal-ledger-crypto-mode').textContent = data.crypto_mode;
+    const countEl = document.getElementById('ledger-total-blocks') || document.getElementById('modal-ledger-total-blocks');
+    if (countEl) countEl.textContent = `${data.total_blocks} Verified Blocks`;
 
+    const modeEl = document.getElementById('ledger-crypto-mode') || document.getElementById('modal-ledger-crypto-mode');
+    if (modeEl) modeEl.textContent = data.crypto_mode;
+
+    const container = document.getElementById('ledger-blocks-container');
     const tbody = document.getElementById('ledger-table-body');
-    tbody.innerHTML = '';
 
-    [...data.ledger].reverse().forEach(block => {
-      const tr = document.createElement('tr');
-      const timeStr = new Date(block.timestamp * 1000).toLocaleString();
-      const detailsStr = typeof block.details === 'object' ? JSON.stringify(block.details) : String(block.details);
-
-      tr.innerHTML = `
-        <td style="font-weight: 700; color: var(--cyan-primary);">#${block.index}</td>
-        <td>${timeStr}</td>
-        <td><strong>${escapeHtml(block.action)}</strong></td>
-        <td><span class="user-role-badge">${escapeHtml(block.actor)}</span></td>
-        <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(detailsStr)}">${escapeHtml(detailsStr)}</td>
-        <td>
-          <span style="font-family: var(--font-mono); font-size: 10px; color: #38bdf8;">${block.block_hash.substring(0, 18)}...</span>
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
+    if (container) {
+      container.innerHTML = '';
+      [...data.ledger].reverse().forEach(block => {
+        const timeStr = new Date(block.timestamp * 1000).toLocaleTimeString();
+        const detailsStr = typeof block.details === 'object' ? JSON.stringify(block.details) : String(block.details);
+        const card = document.createElement('div');
+        card.style.cssText = 'background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px 14px; font-size: 11.5px; display: flex; flex-direction: column; gap: 4px;';
+        card.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <span style="font-weight: 800; color: #0284C7; font-family: var(--font-mono);">#${block.index}</span>
+              <strong style="color: #1E2024;">${escapeHtml(block.action)}</strong>
+              <span style="background: #E2E8F0; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 600;">${escapeHtml(block.actor)}</span>
+            </div>
+            <span style="font-size: 10px; color: #64748B;">${timeStr}</span>
+          </div>
+          <div style="color: #475569; font-size: 11px; font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(detailsStr)}">
+            ${escapeHtml(detailsStr)}
+          </div>
+          <div style="font-size: 9.5px; font-family: var(--font-mono); color: #94A3B8; margin-top: 2px;">
+            SHA-256 Hash: <span style="color: #0284C7;">${block.block_hash}</span>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    } else if (tbody) {
+      tbody.innerHTML = '';
+      [...data.ledger].reverse().forEach(block => {
+        const tr = document.createElement('tr');
+        const timeStr = new Date(block.timestamp * 1000).toLocaleString();
+        const detailsStr = typeof block.details === 'object' ? JSON.stringify(block.details) : String(block.details);
+        tr.innerHTML = `
+          <td style="font-weight: 700; color: #0284C7;">#${block.index}</td>
+          <td>${timeStr}</td>
+          <td><strong>${escapeHtml(block.action)}</strong></td>
+          <td><span>${escapeHtml(block.actor)}</span></td>
+          <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(detailsStr)}</td>
+          <td><span style="font-family: var(--font-mono); font-size: 10px; color: #0284C7;">${block.block_hash.substring(0, 18)}...</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
   } catch (err) {
     console.error("Ledger load error:", err);
   }
