@@ -143,10 +143,10 @@ class TestAccessDriftComprehensive(unittest.TestCase):
         self.assertEqual(res_root.status_code, 200)
         self.assertIn("AccessDrift", res_root.text)
 
-        res_css = self.client.get("/static/styles.css")
+        res_css = self.client.get("/static/css/variables.css")
         self.assertEqual(res_css.status_code, 200)
 
-        res_js = self.client.get("/static/app.js")
+        res_js = self.client.get("/static/js/app.js")
         self.assertEqual(res_js.status_code, 200)
 
 

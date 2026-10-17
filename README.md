@@ -1,4 +1,4 @@
-﻿# AccessDrift — Zero-Trust Continuous Identity Governance
+# AccessDrift — Zero-Trust Continuous Identity Governance
 
 > **Continuous Identity Entitlement Drift Detection & Zero-Trust Governance**  
 > IBM Z Datathon · Track 2 (AI Secured) · Track 1 (Real-Time AI)  
@@ -23,11 +23,20 @@
    - [1-Step Install and Run](#1-step-install-and-run)
    - [Manual Step-by-Step](#manual-step-by-step)
    - [Running as a Systemd Service](#running-as-a-systemd-service)
-5. [Running the Test Suite](#5-running-the-test-suite)
-6. [Repository Structure](#6-repository-structure)
-7. [API Reference](#7-api-reference)
-8. [Core Platform Capabilities](#8-core-platform-capabilities)
-9. [Troubleshooting](#9-troubleshooting)
+5. [Containerized Deployment — Docker & Docker Compose](#5-containerized-deployment--docker--docker-compose)
+   - [Multi-Architecture Docker Build](#multi-architecture-docker-build)
+   - [Running with Docker](#running-with-docker)
+   - [Running with Docker Compose](#running-with-docker-compose)
+6. [Port Forwarding & Remote Access](#6-port-forwarding--remote-access)
+   - [SSH Local Port Forwarding](#ssh-local-port-forwarding-recommended)
+   - [Direct Firewall / Security Group Access](#direct-firewall--security-group-access)
+   - [Public Tunnel for Evaluators (Cloudflare Tunnel / ngrok)](#public-tunnel-for-evaluators)
+7. [IBM Z Datathon Submission Guide](#7-ibm-z-datathon-submission-guide)
+8. [Running the Test Suite](#8-running-the-test-suite)
+9. [Repository Structure](#9-repository-structure)
+10. [API Reference](#10-api-reference)
+11. [Core Platform Capabilities](#11-core-platform-capabilities)
+12. [Troubleshooting](#12-troubleshooting)
 
 ---
 
@@ -271,9 +280,185 @@ sudo systemctl restart accessdrift   # Restart after code changes
 sudo systemctl disable accessdrift   # Remove from auto-start
 ```
 
+
 ---
 
-## 5. Running the Test Suite
+## 5. Containerized Deployment — Docker & Docker Compose
+
+AccessDrift includes a production-grade multi-architecture Dockerfile tested for both **`linux/amd64`** and **`linux/s390x` (IBM LinuxONE)**.
+
+### Key Docker Features:
+- **Zero-Trust Non-Root Execution:** Runs under an unprivileged `appuser` system account.
+- **Embedded Automated Verification:** Pre-flight test suite executes during image build.
+- **Micro Footprint:** Consumes `< 60MB RAM` in production.
+- **Built-in Healthcheck:** Integrated curl health probe against `/api/v1/system/health`.
+
+---
+
+### Running with Docker
+
+#### 1. Build the Docker Image
+
+```bash
+docker build -t accessdrift:latest .
+```
+
+*For multi-architecture build targeting IBM LinuxONE (`s390x`) from x86_64 host:*
+```bash
+docker buildx build --platform linux/s390x,linux/amd64 -t accessdrift:latest .
+```
+
+#### 2. Run the Container
+
+```bash
+docker run -d \
+  --name accessdrift \
+  -p 8000:8000 \
+  --restart unless-stopped \
+  accessdrift:latest
+```
+
+#### 3. Verify Container Status & Logs
+
+```bash
+# Check container status & healthcheck
+docker ps
+
+# Stream application logs
+docker logs -f accessdrift
+
+# Test live API health
+curl -s http://localhost:8000/api/v1/system/health
+```
+
+---
+
+### Running with Docker Compose
+
+A pre-configured [`docker-compose.yml`](file:///d:/Projects/IBMZ-accessdrift/docker-compose.yml) is included:
+
+```bash
+# Start in background
+docker compose up -d
+
+# Check service logs
+docker compose logs -f
+
+# Stop service
+docker compose down
+```
+
+---
+
+## 6. Port Forwarding & Remote Access
+
+When deploying AccessDrift inside a Docker container on an **IBM LinuxONE Community Cloud** virtual machine, use one of the following methods to access the web dashboard:
+
+### Method A — SSH Local Port Forwarding (Recommended & Most Secure)
+
+If your IBM LinuxONE VM has a private IP or the cloud firewall blocks port 8000, forward port 8000 through your existing SSH connection:
+
+```bash
+# Run this on your LOCAL laptop / development machine:
+ssh -L 8000:localhost:8000 <linuxone-user>@<linuxone-ip-or-hostname>
+```
+
+- Example: `ssh -L 8000:localhost:8000 ubuntu@148.100.xxx.xxx`
+- Open your browser locally at: **`http://localhost:8000`**
+- All web dashboard traffic is securely encrypted and routed directly to your LinuxONE instance.
+
+### Method B — Direct Firewall & Security Group Access
+
+If you want judges or team members to access the dashboard directly via the VM's public IP:
+
+1. **Host Firewall Opening (inside the LinuxONE VM):**
+   ```bash
+   # Ubuntu / Debian
+   sudo ufw allow 8000/tcp && sudo ufw reload
+
+   # RHEL / CentOS Stream
+   sudo firewall-cmd --permanent --add-port=8000/tcp && sudo firewall-cmd --reload
+   ```
+
+2. **Cloud Security Group Inbound Rule:**
+   - In your IBM Cloud / LinuxONE Community Cloud console, go to **Network / Security Groups**.
+   - Add an **Inbound Rule**: Protocol `TCP`, Port `8000`, Source `0.0.0.0/0` (or your specific IP).
+   - Access directly at: **`http://<linuxone-ip>:8000`**.
+
+### Method C — Public Tunnel for Evaluators (No Inbound Firewall Needed)
+
+If your LinuxONE instance is behind strict NAT or VPN, you can expose a temporary public HTTPS link in 30 seconds:
+
+```bash
+# Option 1: Cloudflare Tunnel (Free, fast, no signup required)
+curl -L --output cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-s390x
+chmod +x cloudflared
+./cloudflared tunnel --url http://localhost:8000
+
+# Option 2: Localtunnel (via Node)
+npx localtunnel --port 8000
+```
+
+Both tools generate a public HTTPS URL (e.g. `https://xxxx.trycloudflare.com`) that you can paste directly into your hackathon submission.
+
+---
+
+## 7. IBM Z Datathon Submission Guide
+
+Follow this step-by-step checklist to ensure your submission is top-tier:
+
+### Pre-Submission Quality Checklist
+
+- [x] **21/21 Unit & Security Tests Pass:**
+  ```bash
+  python -m unittest discover -s backend/tests -v
+  ```
+- [x] **CPACF / Cryptographic Vault Active:**
+  Verify `/api/v1/system/health` outputs `HEALTHY` and indicates CPACF acceleration on LinuxONE.
+- [x] **RAM Budget Verified:**
+  Memory consumption stays below **60 MB** (leaving >3.5 GB free on a 4 GB LinuxONE quota).
+- [x] **Docker Image Builds & Runs:**
+  Docker container starts and passes healthcheck without errors.
+- [x] **Presentation Dataset Ready:**
+  Preloaded with `trail_demo_ceo` (Victoria Sterling — CISO).
+
+---
+
+### Step-by-Step Submission Deliverables
+
+When submitting on Devpost, HackerEarth, or the IBM Z submission portal, prepare the following 4 items:
+
+#### 1. Public GitHub Repository Link
+Ensure your repository is **public** and includes:
+- Clean code structure (`backend/`, `frontend/`, `datasets/`)
+- Production [`Dockerfile`](file:///d:/Projects/IBMZ-accessdrift/Dockerfile) and [`docker-compose.yml`](file:///d:/Projects/IBMZ-accessdrift/docker-compose.yml)
+- Comprehensive [`README.md`](file:///d:/Projects/IBMZ-accessdrift/README.md) with architecture details and screenshots
+
+#### 2. Live Demo URL / Evaluator Access
+Provide evaluators with:
+- **URL:** `http://<your-linuxone-ip>:8000` or Cloudflare Tunnel HTTPS link
+- **Demo Credentials:**
+  - Executive Persona: `trail_demo_ceo` / `trail_demo` (Preloaded enterprise dataset)
+  - Admin Evaluator: `admin` / `AccessDrift@Admin2026!`
+  - Blank Workspace: Any arbitrary new username & password
+
+#### 3. 3-to-5 Minute Demo Video
+Structure your video according to the winning pitch flow:
+1. **The Problem (0:00 - 0:45):** Explain privilege creep / entitlement drift in enterprise hybrid clouds.
+2. **Platform Architecture on LinuxONE (0:45 - 1:30):** Highlight s390x architecture, CPACF hardware cryptographic acceleration, and `<60MB RAM` footprint.
+3. **Interactive Force Topology & ML Detection (1:30 - 2:45):** Log in as Victoria Sterling, show force-directed canvas, zoom in on Bob Vance's anomaly score and XAI feature contribution.
+4. **1-Click Dual Remediation (2:45 - 3:30):** Click "Remediate", inspect the simultaneous **AWS IAM JSON** policy and **IBM Z RACF commands**.
+5. **CPACF Blockchain Audit Ledger (3:30 - 4:00):** Open the tamper-evident ledger modal, show cryptographic hash chain verification.
+
+#### 4. Architecture Pitch Deck / Summary
+Include a short PDF slide deck or submission description covering:
+- Track alignment (e.g. Track 1: Real-Time AI, Track 2: AI Secured)
+- Machine Learning methodology: Isolation Forest ML pipeline (ROC-AUC 0.972, F1 0.8697)
+- Dual remediation value proposition: Mainframe security (RACF) + Cloud IAM (AWS) in a single pane of glass.
+
+---
+
+## 8. Running the Test Suite
 
 AccessDrift ships with **21 comprehensive tests** covering auth, ML inference, cryptography, and enterprise workflows.
 
@@ -306,10 +491,13 @@ OK
 
 ---
 
-## 6. Repository Structure
+## 9. Repository Structure
 
 ```
 IBMZ-accessdrift/
+├── Dockerfile                # Multi-arch production container (linux/s390x & amd64)
+├── docker-compose.yml        # 1-click container orchestration
+├── .dockerignore             # Optimized build context filtering
 ├── backend/
 │   ├── auth.py               # RFC 7519 JWT · PBKDF2 hashing · 4-tier RBAC · trial personas
 │   ├── crypto.py             # CPACF / OpenSSL AES-GCM vault · SHA-256 blockchain ledger
@@ -360,7 +548,7 @@ IBMZ-accessdrift/
 
 ---
 
-## 7. API Reference
+## 10. API Reference
 
 | Method | Endpoint | Auth Required | Description |
 |:-------|:---------|:-------------|:------------|
@@ -387,7 +575,7 @@ IBMZ-accessdrift/
 
 ---
 
-## 8. Core Platform Capabilities
+## 11. Core Platform Capabilities
 
 | Capability | Detail |
 |:-----------|:-------|
@@ -401,7 +589,7 @@ IBMZ-accessdrift/
 
 ---
 
-## 9. Troubleshooting
+## 12. Troubleshooting
 
 ### Port 8000 already in use
 
