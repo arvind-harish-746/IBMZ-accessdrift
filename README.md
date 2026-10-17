@@ -112,26 +112,13 @@ Open **http://127.0.0.1:8000** — the login screen appears.
 
 ### Linux / macOS
 
-**Option A — Bundled launcher (recommended):**
-
 ```bash
 git clone https://github.com/<your-org>/IBMZ-accessdrift.git
 cd IBMZ-accessdrift
-chmod +x run_dev.sh
-./run_dev.sh
-```
-
-The dev launcher (`run_dev.sh`) automatically:
-1. Creates `.venv` if missing and installs all dependencies
-2. Runs the full 21-test security & cryptography test suite
-3. Starts the server at **http://0.0.0.0:8000** with hot-reload and debug logging
-
-**Option B — Manual:**
-
-```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements.txt
+python -m unittest discover backend/tests
 python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
@@ -167,27 +154,26 @@ sudo dnf install -y python3 python3-pip python3-venv git
 
 ---
 
-### 1-Step Install and Run
+### Docker Compose Deployment (Recommended for LinuxONE)
 
 ```bash
-# Clone, setup, verify, and launch in one command
+# Clone the repository
 git clone https://github.com/<your-org>/IBMZ-accessdrift.git
 cd IBMZ-accessdrift
-chmod +x run_prod.sh
-./run_prod.sh
+
+# Build with BuildKit and launch via Docker Compose
+export DOCKER_BUILDKIT=1
+docker compose build
+docker compose up -d
+
+# Verify container health and logs
+docker compose ps
+docker compose logs -f accessdrift
 ```
 
-The production launcher (`run_prod.sh`) will:
-1. Verify the virtual environment exists (fail-safe hint to run `run_dev.sh` first if missing)
-2. Execute pre-flight cryptographic + ML integrity checks
-3. Print available system memory
-4. Start the **production-grade server** at `http://0.0.0.0:8000`:
-   - 1 Uvicorn worker (RAM-optimised for 4 GB budget)
-   - Proxy header forwarding enabled
-   - Keep-alive timeout: 30s
-   - Log level: `info`
+The Docker container runs with an unprivileged non-root user (`appuser:10001`), hardened multi-stage build, and auto-detects CPACF hardware acceleration on `s390x`.
 
-> The UI is served directly by FastAPI — **no separate web server (nginx/apache) or frontend build step required**.
+> The UI is served directly by FastAPI at `http://<linuxone-ip>:8000` — **no separate web server (nginx/apache) or frontend build step required**.
 
 ---
 
@@ -539,8 +525,8 @@ IBMZ-accessdrift/
 │           ├── roster-table.js  # Employee directory table with role/risk filters
 │           └── toast.js      # Toast notification utility · DOM escape helper
 │
-├── run_dev.sh                # One-command dev launcher (Linux / macOS)
-├── run_prod.sh               # One-command production launcher (LinuxONE)
+├── Dockerfile                # Hardened multi-stage build (s390x / IBM LinuxONE)
+├── docker-compose.yml        # Orchestration with health checks & memory limits
 ├── frontend_propmt.md        # Frontend specification prompt used to build the UI
 ├── .gitignore
 └── README.md
