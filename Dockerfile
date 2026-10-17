@@ -29,8 +29,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copy backend, frontend, dataset, and entrypoint files
 COPY backend/ /app/backend/
-COPY frontend/ /app/frontend/
-COPY datasets/ /app/datasets/
 
 # Run automated pre-flight security and unit tests during image build
 RUN python -m unittest discover -s /app/backend/tests -v
