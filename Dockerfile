@@ -1,50 +1,55 @@
+
 # ==============================================================================
 # AccessDrift: Zero-Trust Continuous Identity Governance
-# Multi-Architecture Dockerfile (Supports linux/amd64 and linux/s390x IBM LinuxONE)
+# Multi-Architecture: linux/amd64 and linux/s390x (IBM LinuxONE)
 # ==============================================================================
 
-FROM python:3.11-slim AS base
+FROM python:3.11-slim
 
-# Prevent Python from writing .pyc files and enable unbuffered output
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8000
+    PORT=8000 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies (curl for container healthcheck)
+# System dependencies for Python packages, scientific computing and health checks
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    build-essential \
+    gfortran \
+    pkg-config \
+    libssl-dev \
+    libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Create a non-privileged user for Zero-Trust enterprise container execution
-RUN groupadd -r appgroup && useradd -r -g appgroup -d /app -s /sbin/nologin appuser
+# Run as a non-root user
+RUN groupadd -r appgroup && \
+    useradd -r -g appgroup -d /app -s /usr/sbin/nologin appuser
 
-# Copy backend requirements first to leverage Docker layer caching
+# Install Python dependencies first for layer caching
 COPY backend/requirements.txt /app/backend/requirements.txt
 
-# Install Python production dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r /app/backend/requirements.txt
+RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    python -m pip install --no-cache-dir -r /app/backend/requirements.txt
 
-# Copy backend, frontend, dataset, and entrypoint files
+# Application source and static frontend
 COPY backend/ /app/backend/
+COPY frontend/ /app/frontend/
 
-# Run automated pre-flight security and unit tests during image build
+# Pre-flight unit tests
 RUN python -m unittest discover -s /app/backend/tests -v
 
-# Change file ownership to non-root user
+# Ensure the application can write to its working directory if required
 RUN chown -R appuser:appgroup /app
 
-# Switch to non-root user
 USER appuser
 
-# Expose AccessDrift HTTP port
 EXPOSE 8000
 
-# Container healthcheck querying AccessDrift health & memory endpoint
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/api/v1/system/health || exit 1
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8000/api/v1/system/health || exit 1
 
-# Production command (1 worker, lean memory footprint ~50MB RAM)
+# Start FastAPI; the frontend is served by the backend
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips=*"]
