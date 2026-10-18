@@ -68,7 +68,11 @@ class MLInferenceService:
     def load_artifacts(self) -> None:
         """Loads serialized model pipeline and metadata configuration."""
         if self.model_path.exists():
-            self.pipeline = joblib.load(self.model_path)
+            try:
+                self.pipeline = joblib.load(self.model_path)
+            except Exception as e:
+                print(f"[MLInferenceService] Warning: Failed to load model artifact: {e}")
+                self.pipeline = None
         else:
             print(f"[MLInferenceService] Warning: Model artifact not found at {self.model_path}")
 
