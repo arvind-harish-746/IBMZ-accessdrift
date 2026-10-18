@@ -87,7 +87,7 @@ Any other username / password combination creates a **fresh blank enterprise wor
 
 ```powershell
 # 1. Clone the repository
-git clone https://github.com/<your-org>/IBMZ-accessdrift.git
+git clone https://github.com/arvind-harish-746/IBMZ-accessdrift.git
 cd IBMZ-accessdrift
 
 # 2. Create and activate virtual environment
@@ -113,7 +113,7 @@ Open **http://127.0.0.1:8000** — the login screen appears.
 ### Linux / macOS
 
 ```bash
-git clone https://github.com/<your-org>/IBMZ-accessdrift.git
+git clone https://github.com/arvind-harish-746/IBMZ-accessdrift.git
 cd IBMZ-accessdrift
 python3 -m venv .venv
 source .venv/bin/activate
