@@ -158,7 +158,7 @@ sudo dnf install -y python3 python3-pip python3-venv git
 
 ```bash
 # Clone the repository
-git clone https://github.com/<your-org>/IBMZ-accessdrift.git
+git clone https://github.com/arvind-harish-746/IBMZ-accessdrift.git
 cd IBMZ-accessdrift
 
 # Build with BuildKit and launch via Docker Compose
@@ -181,7 +181,7 @@ The Docker container runs with an unprivileged non-root user (`appuser:10001`), 
 
 ```bash
 # Step 1 — Clone
-git clone https://github.com/<your-org>/IBMZ-accessdrift.git
+git clone https://github.com/arvind-harish-746/IBMZ-accessdrift.git
 cd IBMZ-accessdrift
 
 # Step 2 — Python virtual environment
