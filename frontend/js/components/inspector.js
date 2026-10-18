@@ -1,6 +1,6 @@
 /**
  * Identity Inspector & Explainable AI (XAI) Component
- * Styled to match the right profile and call-recording waveform panel in the mockup
+ * Styled to display user telemetry and remediation panels
  */
 import { state } from '../state.js';
 import { api } from '../api.js';
@@ -104,17 +104,7 @@ export function selectUser(userId, onDataRefresh) {
     }
   }
 
-  // 3. Waveform Scrubber & Remediation Widget
-  const needle = document.getElementById('waveform-needle');
-  const scorePercent = Math.min(100, Math.max(5, user.risk_score || 10));
-  if (needle) {
-    needle.style.left = `${scorePercent}%`;
-  }
-  const needleTime = document.getElementById('waveform-time-label');
-  if (needleTime) {
-    needleTime.style.left = `${scorePercent}%`;
-    needleTime.textContent = `00:${String(user.risk_score || 0).padStart(2, '0')}`;
-  }
+  // 3. Remediation Action Widget
 
   const remediateBtn = document.getElementById('btn-remediate-now');
   if (remediateBtn) {
@@ -156,9 +146,7 @@ export async function executeRemediation(onSuccess) {
     const result = await api.remediate(targetId, true);
     state.remediationResult = result;
 
-    if (window.confetti) {
-      window.confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
-    }
+
 
     showToast(`Remediated privilege creep for ${user ? user.name : targetId}!`, 'success');
 

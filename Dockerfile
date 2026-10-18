@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG BASE_IMAGE=python:3.11-slim-bookworm
+ARG BASE_IMAGE=python:3.14-slim
 
 # =============================================================================
 # Stage 1: Build & Dependency Installation Stage
@@ -34,7 +34,7 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Upgrade packaging tools
-RUN pip install --upgrade pip setuptools wheel
+RUN pip install --upgrade "pip>=24.0" setuptools wheel
 
 # Install dependencies into virtual environment
 COPY backend/requirements.txt /tmp/requirements.txt
